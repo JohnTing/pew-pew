@@ -233,7 +233,11 @@ public class Shooter {
         public float
             inaccuracy = 2f, // in degrees
             damageMultiplier = 1f,
-            reload = .3f; // in seconds
+            reload = .3f, // in seconds
+            speedMultiplier = 1f,
+            lifetimeMultiplier = 1f,
+            burstSpacing = 0f;
+
         public int
             bulletsPerShot = 2,
             ammoMultiplier = 4,
@@ -272,24 +276,31 @@ public class Shooter {
         }
 
         public void shoot(Data d){
-            Unit u = d.unit;
             if(d.reloadProgress < stats.reload) {
                 return;
             }
             d.reloadProgress = 0;
 
+            if(stats.burstSpacing > 0.0001f) {
+                for(int i = 1; i < stats.bulletsPerShot; i++){
+                    Time.run(stats.burstSpacing * i * 60, () -> {
+                        shootBullet(d, 1);
+                    });
+                }
+            } else {
+                shootBullet(d, stats.bulletsPerShot);
+            }
+        }
+
+        public void shootBullet(Data d, int number) {
+            Unit u = d.unit;
             // refilling ammo
             if(d.ammo == 0) {
                 // not enough items to get new ammo
                 if(u.stack.amount < stats.itemsPerScoop) {
                     return;
                 }
-
-                u.stack.amount -= stats.itemsPerScoop;
-                d.ammo += stats.ammoMultiplier;
             }
-
-            d.ammo--;
 
             h1
             .set(original.range(), 0) // set length to range
@@ -297,8 +308,8 @@ public class Shooter {
             .add(h3.set(u.vel).scl(60f)); // add velocity offset
 
             // its math
-            float vel = h1.len() / original.lifetime / bullet.speed;
-            float life = original.lifetime / bullet.lifetime;
+            float vel = h1.len() * stats.speedMultiplier / original.lifetime / bullet.speed;
+            float life = stats.lifetimeMultiplier * original.lifetime / bullet.lifetime;
             float dir = h1.angle();
 
             if(!bullet.collides) {
@@ -306,7 +317,21 @@ public class Shooter {
                 life *= Math.min(h2.len() / bullet.range(), 1f) ; // bullet is controlled by cursor
             }
 
-            for(int i = 0; i < stats.bulletsPerShot; i++){
+
+            for(int i = 0; i < number; i++){
+
+                // refilling ammo
+                if(d.ammo == 0) {
+                    // not enough items to get new ammo
+                    if(u.stack.amount < stats.itemsPerScoop) {
+                        return;
+                    }
+
+                    u.stack.amount -= stats.itemsPerScoop;
+                    d.ammo += stats.ammoMultiplier;
+                }
+                d.ammo--;
+
                 Call.createBullet(
                     bullet,
                     u.team,
